@@ -95,9 +95,22 @@ export default function Map() {
     // Handle creating and drawing the current Polyline
     const [boxPoints, setBoxPoints] = useState([]);
     const currPolyline = useRef();
-
+    
+    const MIN_DISTANCE = 2;
     let addBoxPoint = (coordinates) => {
-        setBoxPoints([...boxPoints, coordinates]);
+        if (boxPoints.length === 0) {
+            setBoxPoints([coordinates]);
+        } else {
+            const lastPoint = boxPoints[boxPoints.length - 1];
+            const distance = window.google.maps.geometry.spherical.computeDistanceBetween(
+                new window.google.maps.LatLng(lastPoint),
+                new window.google.maps.LatLng(coordinates)
+            );
+            
+            if (distance > MIN_DISTANCE) {
+                setBoxPoints([...boxPoints, coordinates]);
+            }
+        }
     };
 
     useEffect(() => {
@@ -158,9 +171,6 @@ export default function Map() {
                 fillOpacity: 0.35,
             });
             panel.setMap(mapRef.current);
-            panel.addListener('click', () => {
-                this.delete();
-            });
             panel.addListener('mouseover', () => { setPanelHovering(index); });
             panel.addListener('mouseout', () => { setPanelHovering(undefined); });
             this.updateColor();
