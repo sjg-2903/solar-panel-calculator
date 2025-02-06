@@ -1,10 +1,8 @@
-
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { GoogleMap, Marker } from "@react-google-maps/api";
 import Places from "./Places";
 import React from "react";
 import "./styles.css";
-import { MY_GOOGLE_API_KEY } from "./GoogleAPIKey";
 
 const latLngLiteral = {
     lat: 51.1657,
@@ -16,8 +14,10 @@ const mapOptions = {
     zoom: 6,
 };
 
+
+
 export default function Map() {
-    const [energyConsumption, setEnergyConsumption] = useState(900); // in kWh
+    const [energyConsumption, setEnergyConsumption] = useState(900);
     const solarPanelWidth = 3.5; // in ft
     const solarPanelHeight = 5; // in ft
     const solarPanelArea = solarPanelWidth * solarPanelHeight; // in sq ft
@@ -39,25 +39,29 @@ export default function Map() {
             lng: lngSum / boxPoints.length
         };
     };
-    
-    const fetchSolarApiData = async () => {
-        const center = getSelectedAreaCenter();
-        if (!center) return;
-        const url = `https://solar.googleapis.com/v1/buildingInsights:findClosest?location.latitude=${center.lat}&location.longitude=${center.lng}&key=${MY_GOOGLE_API_KEY}`;
+
+
+
+    const fetchSolarApiData = async (center) => {
+        const url = `https://power.larc.nasa.gov/api/temporal/climatology/point?parameters=ALLSKY_SFC_SW_DWN&community=RE&longitude=${center.lng}&latitude=${center.lat}&format=JSON`;
         try {
             const response = await fetch(url);
             const data = await response.json();
-            console.log("Solar API Data", data);
-            if (data.solarPotential) {
-                setSolarData(data);
-            } else {
-                console.error("Solar potential data not found");
+            if (data?.properties?.parameter?.ALLSKY_SFC_SW_DWN?.ANN) {
+                const annualIrradiance = data.properties.parameter.ALLSKY_SFC_SW_DWN.ANN; // kWh/m²/day
+                if (typeof annualIrradiance === "number" && !isNaN(annualIrradiance)) {
+                    const sunshineHours = (annualIrradiance * 365).toFixed(2);
+                    const co2Savings = (annualIrradiance * 365 * 0.4).toFixed(2);
+                    return { maxSunshineHoursPerYear: Number(sunshineHours), carbonOffsetFactorKgPerMwh: Number(co2Savings) };
+                }
             }
+            return null;
         } catch (error) {
-            console.error("Error fetching solar data:", error);
+            console.error("Error fetching NASA solar data:", error);
+            return null;
         }
     };
-
+    
     const [home, setHome] = useState();
     useEffect(() => {
         if (home) {
@@ -109,7 +113,7 @@ export default function Map() {
             newPolyline.setMap(mapRef.current);
             // newPolyline.addListener('click', () => {newPolyline.setMap(null);})
             currPolyline.current = newPolyline;
-            fetchSolarApiData();
+
         } else {
             if (currPolyline.current !== undefined) {
                 currPolyline.current.setMap(null);
@@ -136,6 +140,8 @@ export default function Map() {
         point.setMap(mapRef.current);
     }
 
+
+
     class roofPanel {
         isDeleted = false;
         points;
@@ -144,13 +150,11 @@ export default function Map() {
         index;
         solarPanels = [];
 
-        constructor(points, index) {
+        constructor(points, index, solarData) {
             const panel = new window.google.maps.Polygon({
                 paths: points,
-                strokeColor: "#FF0000",
                 strokeOpacity: 0.8,
                 strokeWeight: 2,
-                fillColor: "#FF0000",
                 fillOpacity: 0.35,
             });
             panel.setMap(mapRef.current);
@@ -159,10 +163,11 @@ export default function Map() {
             });
             panel.addListener('mouseover', () => { setPanelHovering(index); });
             panel.addListener('mouseout', () => { setPanelHovering(undefined); });
-
+            this.updateColor();
             this.area = window.google.maps.geometry.spherical.computeArea(points) * 10.7639; // convert square meters to square feet
             this.index = index;
             this.points = points;
+            this.solarData = solarData;
             this.panel = panel;
 
             // Draw solar panels
@@ -173,77 +178,11 @@ export default function Map() {
                     break;
             }
         }
-
-        // drawSolarPanelsInTriangle(points) {
-        //     // 1. Identify side with largest vertical component
-        //     let yComponentLengths = [];
-
-        //     points.forEach((point, index) => {
-        //         yComponentLengths.push([]);
-        //         points.map((otherPoint) => {
-        //             yComponentLengths[index].push(Math.abs(point.lat - otherPoint.lat));
-        //         });
-        //     });
-
-        //     let maxVal = 0;
-        //     let maxLine = [{ lat: 0, lng: 0 }, { lat: 0, lng: 0 }];
-
-        //     for (let r = 0; r < yComponentLengths.length; r++) {
-        //         for (let c = 0; c < yComponentLengths.length; c++) {
-        //             if (yComponentLengths[r][c] > maxVal) {
-        //                 maxVal = yComponentLengths[r][c];
-        //                 maxLine[0] = points[r];
-        //                 maxLine[1] = points[c];
-        //             }
-        //         }
-        //     }
-
-        //     // 2. Identify northernmost point on line
-        //     let northMost, southMost;
-        //     if (maxLine[0].lat > maxLine[1].lat) {
-        //         northMost = maxLine[0];
-        //         southMost = maxLine[1];
-        //     } else {
-        //         northMost = maxLine[1];
-        //         southMost = maxLine[0];
-        //     }
-
-        //     let maxLineHeading = window.google.maps.geometry.spherical.computeHeading(northMost, southMost);
-        //     let solarPanelDistanceOnLine = Math.abs((solarPanelHeight * 0.3048) / (Math.cos(((180 - Math.abs(maxLineHeading)) * (Math.PI / 180)))));
-        //     let currPointOnMaxLine = window.google.maps.geometry.spherical.computeOffset(northMost, solarPanelDistanceOnLine, maxLineHeading);
-
-        //     let westOfCurrPointOnMaxLine = window.google.maps.geometry.spherical.computeOffset(currPointOnMaxLine, (solarPanelWidth * 0.3048), 270);
-        //     let eastOfCurrPointOnMaxLine = window.google.maps.geometry.spherical.computeOffset(currPointOnMaxLine, (solarPanelWidth * 0.3048), 90);
-
-        //     let canDrawPanels = true;
-        //     if (window.google.maps.geometry.poly.containsLocation(westOfCurrPointOnMaxLine, this.panel)) {
-        //         while (canDrawPanels) {
-        //             this.drawRowOfPanels(currPointOnMaxLine, CardinalDirection.west);
-        //             let southPointOfNextPanel = window.google.maps.geometry.spherical.computeOffset(currPointOnMaxLine, (2 * solarPanelHeight * 0.3048), 180);
-        //             if (southPointOfNextPanel.lat() - southMost.lat < 0) {
-        //                 canDrawPanels = false;
-        //             }
-        //             currPointOnMaxLine = window.google.maps.geometry.spherical.computeOffset(currPointOnMaxLine, solarPanelDistanceOnLine, maxLineHeading);
-        //         }
-        //     } else if (window.google.maps.geometry.poly.containsLocation(eastOfCurrPointOnMaxLine, this.panel)) {
-        //         while (canDrawPanels) {
-        //             this.drawRowOfPanels(currPointOnMaxLine, CardinalDirection.east);
-        //             let southPointOfNextPanel = window.google.maps.geometry.spherical.computeOffset(currPointOnMaxLine, (2 * solarPanelHeight * 0.3048), 180);
-        //             if (southPointOfNextPanel.lat() - southMost.lat < 0) {
-        //                 canDrawPanels = false;
-        //             }
-        //             currPointOnMaxLine = window.google.maps.geometry.spherical.computeOffset(currPointOnMaxLine, solarPanelDistanceOnLine, maxLineHeading);
-        //         }
-        //     }
-
-        //     return true;
-        // }
-
         drawSolarPanelsInTriangle(points) {
-            // 1. Identify the side with the largest vertical component
+
             let maxVal = 0;
             let maxLine = [{ lat: 0, lng: 0 }, { lat: 0, lng: 0 }];
-            
+
             for (let i = 0; i < points.length; i++) {
                 for (let j = i + 1; j < points.length; j++) {
                     let verticalDiff = Math.abs(points[i].lat - points[j].lat);
@@ -253,21 +192,21 @@ export default function Map() {
                     }
                 }
             }
-        
+
             // 2. Identify northernmost and southernmost points
             let [northMost, southMost] = maxLine[0].lat > maxLine[1].lat ? [maxLine[0], maxLine[1]] : [maxLine[1], maxLine[0]];
-        
+
             // 3. Compute panel placement along the max vertical line
             let maxLineHeading = window.google.maps.geometry.spherical.computeHeading(northMost, southMost);
             let panelStep = Math.abs((solarPanelHeight * 0.3048) / Math.cos((180 - Math.abs(maxLineHeading)) * (Math.PI / 180)));
-        
+
             let currPoint = northMost;
             let canDrawPanels = true;
-        
+
             while (canDrawPanels) {
                 let westOfCurrPoint = window.google.maps.geometry.spherical.computeOffset(currPoint, solarPanelWidth * 0.3048, 270);
                 let eastOfCurrPoint = window.google.maps.geometry.spherical.computeOffset(currPoint, solarPanelWidth * 0.3048, 90);
-        
+
                 if (window.google.maps.geometry.poly.containsLocation(westOfCurrPoint, this.panel)) {
                     this.drawRowOfPanels(currPoint, CardinalDirection.west);
                 } else if (window.google.maps.geometry.poly.containsLocation(eastOfCurrPoint, this.panel)) {
@@ -275,7 +214,7 @@ export default function Map() {
                 } else {
                     canDrawPanels = false;
                 }
-        
+
                 // Move to the next row
                 let nextRowPoint = window.google.maps.geometry.spherical.computeOffset(currPoint, 2 * solarPanelHeight * 0.3048, 180);
                 if (nextRowPoint.lat < southMost.lat) {
@@ -283,10 +222,10 @@ export default function Map() {
                 }
                 currPoint = nextRowPoint;
             }
-        
+
             return true;
         }
-        
+
 
         getLngOnLine(startPoint, endPoint, targetLat) {
             return (targetLat - startPoint.lat) * ((endPoint.lng - startPoint.lng) / (endPoint.lat - startPoint.lat)) + startPoint.lng;
@@ -375,6 +314,30 @@ export default function Map() {
             }
         }
 
+        getFillColor(sunshineHours) {
+            if (sunshineHours < 500) {
+                return "#FFFFFF"; // White for less than 500 hours
+            } else if (sunshineHours < 1000) {
+                return "#FFD700"; // Yellow for 500 to 999 hours
+            } else if (sunshineHours < 1500) {
+                return "#FFA500"; // Orange for 1000 to 1499 hours
+            } else if (sunshineHours < 2000) {
+                return "#FF0000"; // Red for 1500 to 1999 hours
+            } else {
+                return "#8B0000"; // Dark red for 2000 and above
+            }
+        }
+        updateColor() {
+            if (this.solarData && this.solarData.maxSunshineHoursPerYear !== undefined) {
+                const color = this.getFillColor(this.solarData.maxSunshineHoursPerYear);
+                this.panel.setOptions({
+                    fillColor: color,
+                    strokeColor: color
+                });
+            }
+        }
+
+
         delete() {
             this.isDeleted = true;
             this.panel.setMap(null);
@@ -394,9 +357,20 @@ export default function Map() {
         }
     }
 
-    let addRoofSegmment = (points) => {
+    let addRoofSegmment = async (points) => {
         let index = roofPanels.length;
-        setRoofPanels([...roofPanels, new roofPanel(points, index)]);
+        const center = getSelectedAreaCenter(points);
+        if (center) {
+            const newPanel = new roofPanel(points, index, null);
+            setRoofPanels([...roofPanels, newPanel]);
+            setBoxPoints([]);
+            const solarData = await fetchSolarApiData(center);
+            if (solarData) {
+                newPanel.solarData = solarData;
+                newPanel.updateColor();
+                setRoofPanels(prevPanels => [...prevPanels]);
+            }
+        }
     };
 
     let getRoofArea = () => {
@@ -410,162 +384,102 @@ export default function Map() {
         return area;
     }
 
-
+    const tdStyle = {
+        padding: "10px",
+        border: "1px solid black",
+        background: "#fff"
+    };
 
     return (
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "100%" }}>
-            {/* Map Container - Takes up 75% of Screen Height */}
-            <div style={{ width: "100%", height: "105vh", position: "relative" }}>
-                <div style={{
-                    position: "absolute",
-                    top:  "60px",
-                    right: "10px",
-                    background: "linear-gradient(to right, #E0F2FE, #C7D2FE)",
-                    padding: "18px 22px",
-                    borderRadius: "14px",
-                    boxShadow: "0 6px 15px rgba(0, 0, 0, 0.2)",
-                    textAlign: "center",
-                    zIndex: 1000,
-                    maxWidth: "320px",
-                    border: "2px solid rgba(255, 255, 255, 0.3)",
-                    backdropFilter: "blur(8px)"
-                }}>
-                    {/* Heading with Sun Icon */}
-                    <div style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                        transform: "scale(1)",
-                        marginBottom: "20px"
-                    }}>
-                        {/* Large Sun Icon */}
-                        <span style={{
-                            fontSize: "40px", // Bigger size for prominence
-                            color: "#F59E0B", // Warm solar color
-                            lineHeight: "45px", // Aligns well with text
-                        }}>
-                            🔆
-                        </span>
-
-                        {/* Text Wrapper */}
-                        <div style={{ textAlign: "left" }}> {/* Move "Solar Roof" to left side */}
-                            <h1 style={{
-                                fontSize: "20px",
-                                fontWeight: "700",
-                                color: "#1E3A8A",
-                                margin: "0",
-                                lineHeight: "24px"
-                            }}>
-                                Solar Roof
-                            </h1>
-                            <h1 style={{
-                                fontSize: "20px",
-                                fontWeight: "700",
-                                color: "#1E3A8A",
-                                margin: "0",
-                                lineHeight: "20px"
-                            }}>
-                                Panel Calculator
-                            </h1>
-                        </div>
-                    </div>
-
-
-                    <Places
-                        setHome={(position) => {
-                            setHome(position);
-                            mapRef.current?.panTo(position);
-                            mapRef.current?.setZoom(15);
-                            console.log('Selected Place:', position);
-                        }}
-                    />
-                </div>
-
-                {/* Google Map */}
-                <GoogleMap
-                    zoom={zoom}
-                    center={center}
-                    mapContainerStyle={{ width: "100%", height: "100%" }}
-                    options={mapOptions}
-                    onLoad={onLoad}
-                    onClick={(e) => addBoxPoint(e.latLng?.toJSON())}
-                >
-                    {boxPoints.length > 0 &&
-                        boxPoints.map((coordinates, index) => (
-                            <Marker
-                                key={index}
-                                position={coordinates}
-                                icon={dotIcon}
-                                onClick={() => {
-                                    if (index === 0 && boxPoints.length >= 3) {
-                                        addRoofSegmment(boxPoints);
-                                        setBoxPoints([]);
-                                    }
-                                }}
-                            />
-                        ))}
-                    {home && <Marker position={home} />}
-                </GoogleMap>
-            </div>
-
-            {/* Bottom Section - Panels & Summary (No Overlapping!) */}
+        <div style={{ display: "flex", height: "100vh", width: "100%" }}>
             <div style={{
-                width: "100%",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
+                width: "30%",
+                height: "100vh",
+                overflowY: "auto",
+                background: "linear-gradient(to right, #E0F2FE, #C7D2FE)",
                 padding: "20px",
-                background: "white"
+                boxShadow: "4px 0 10px rgba(0, 0, 0, 0.1)"
             }}>
-                {/* Panels Section */}
                 <div style={{
-                    width: "100%",
-                    marginBottom: "20px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    marginBottom: "20px"
+                }}>
+                    <span style={{ fontSize: "40px", color: "#F59E0B" }}>🔆</span>
+                    <div>
+                        <h1 style={{ fontSize: "22px", fontWeight: "700", color: "#1E3A8A", margin: "0" }}>Solar Roof</h1>
+                        <h2 style={{ fontSize: "18px", fontWeight: "600", color: "#1E3A8A", margin: "0" }}>Panel Calculator</h2>
+                    </div>
+                </div>
+                <Places
+                    setHome={(position) => {
+                        setHome(position);
+                        mapRef.current?.panTo(position);
+                        mapRef.current?.setZoom(15);
+                    }}
+                />
+                <div style={{
+                    background: "white",
                     padding: "15px",
-                    background: "#f9f9f9",
                     borderRadius: "8px",
-                    boxShadow: "0 2px 6px rgba(0, 0, 0, 0.1)"
+                    boxShadow: "0 2px 6px rgba(0, 0, 0, 0.1)",
+                    marginTop: "20px"
                 }}>
                     <h2>Drawn Panels</h2>
                     <p style={{ fontSize: "14px", color: "#666" }}>
-                        Draw polygons over all south, east, and west-facing sections of your roof.
+                        Draw polygons over south, east, and west-facing sections of your roof.
                     </p>
                     {roofPanels.map((panel, index) =>
                         !panel.isDeleted ? (
-                            <div key={index} style={{
+                            <details key={index} style={{
                                 background: "white",
                                 padding: "10px",
                                 borderRadius: "5px",
                                 marginTop: "5px",
-                                boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
+                                boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                                cursor: "pointer"
                             }}>
-                                <h3>Panel {index + 1}</h3>
+                                <summary style={{
+                                    listStyle: 'none',
+                                    fontWeight: 'bold',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center'
+                                }}>
+                                    <span>Panel {index + 1}</span>
+                                    <span style={{ fontSize: '1.2em' }}>▼</span>
+                                </summary>
                                 <table style={{
                                     width: "100%",
                                     borderCollapse: "collapse",
                                     marginTop: "10px",
                                     marginBottom: "10px",
-                                    textAlign: "left"
+                                    textAlign: "left",
+                                    border: "1px solid black",
+                                    background: "#f9f9f9"
                                 }}>
                                     <thead>
-                                        <tr style={{ background: "#f1f1f1" }}>
-                                            <th style={{ border: "1px solid #ddd", padding: "8px" }}>Metric</th>
-                                            <th style={{ border: "1px solid #ddd", padding: "8px" }}>Value</th>
+                                        <tr style={{ background: "#007bff", color: "white" }}>
+                                            <th style={{ padding: "10px", border: "1px solid black", background: "grey" }}>Property</th>
+                                            <th style={{ padding: "10px", border: "1px solid black", background: "grey" }}>Value</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <tr>
-                                            <td style={{ border: "1px solid #ddd", padding: "8px" }}>Roof Area</td>
-                                            <td style={{ border: "1px solid #ddd", padding: "8px" }}>{(panel.area * 0.092903).toFixed(2)} m²</td>
-                                        </tr>
-                                        <tr>
-                                            <td style={{ border: "1px solid #ddd", padding: "8px" }}>Solar Panels Required</td>
-                                            <td style={{ border: "1px solid #ddd", padding: "8px" }}>{(panel.area / solarPanelArea).toFixed(0)}</td>
-                                        </tr>
-                                        <tr>
-                                            <td style={{ border: "1px solid #ddd", padding: "8px" }}>Annual Power Generation</td>
-                                            <td style={{ border: "1px solid #ddd", padding: "8px" }}>{((panel.area / solarPanelArea * solarPanelEnergyOutput * 12) / energyConsumption * 100).toFixed(2)} kWh/year</td>
-                                        </tr>
+                                        <tr><td style={tdStyle}>Roof Area</td><td style={tdStyle}>{(panel.area * 0.092903).toFixed(2)} m²</td></tr>
+                                        <tr><td style={tdStyle}>Solar Panels</td><td style={tdStyle}>{(panel.area / solarPanelArea).toFixed(0)}</td></tr>
+                                        <tr><td style={tdStyle}>Power Generation</td><td style={tdStyle}>{((panel.area / solarPanelArea * solarPanelEnergyOutput * 12) / energyConsumption * 100).toFixed(2)} kWh/year</td></tr>
+                                        {panel.solarData ? (
+                                            <>
+                                                <tr><td style={tdStyle}>Sunshine Hours</td><td style={tdStyle}>{panel.solarData.maxSunshineHoursPerYear.toFixed(2)} hours</td></tr>
+                                                <tr><td style={tdStyle}>CO2 Savings</td><td style={tdStyle}>{panel.solarData.carbonOffsetFactorKgPerMwh.toFixed(2)} Kg CO₂/year</td></tr>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <tr><td style={tdStyle}>Sunshine Hours</td><td style={tdStyle}>Fetching...</td></tr>
+                                                <tr><td style={tdStyle}>CO2 Savings</td><td style={tdStyle}>Fetching...</td></tr>
+                                            </>
+                                        )}
                                     </tbody>
                                 </table>
                                 <button onClick={() => panel.delete()} style={{
@@ -578,22 +492,20 @@ export default function Map() {
                                 }}>
                                     Delete
                                 </button>
-                            </div>
+                            </details>
                         ) : null
                     )}
                 </div>
 
-                {/* Summary Section */}
+
                 <div style={{
-                    width: "100%",
+                    background: "white",
                     padding: "15px",
-                    background: "#f9f9f9",
                     borderRadius: "8px",
-                    boxShadow: "0 2px 6px rgba(0, 0, 0, 0.1)"
+                    boxShadow: "0 2px 6px rgba(0, 0, 0, 0.1)",
+                    marginTop: "20px"
                 }}>
                     <h2>Summary</h2>
-
-                    {/* Summary Metrics Table */}
                     <table style={{
                         width: "100%",
                         borderCollapse: "collapse",
@@ -601,38 +513,83 @@ export default function Map() {
                         textAlign: "left"
                     }}>
                         <thead>
-                            <tr style={{ background: "#f1f1f1" }}>
-                                <th style={{ border: "1px solid #ddd", padding: "8px" }}>Metric</th>
-                                <th style={{ border: "1px solid #ddd", padding: "8px" }}>Value</th>
+                            <tr style={{ background: "#007bff", color: "white" }}>
+                                <th style={{ padding: "10px", border: "1px solid black", background: "grey" }}>Property</th>
+                                <th style={{ padding: "10px", border: "1px solid black", background: "grey" }}>Value</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr>
-                                <td style={{ border: "1px solid #ddd", padding: "8px" }}>Total Area</td>
-                                <td style={{ border: "1px solid #ddd", padding: "8px" }}>{(getRoofArea() * 0.092903).toFixed(2)} m²</td>
+                            <tr><td style={tdStyle}>Total Area</td><td style={tdStyle}>{(getRoofArea() * 0.092903).toFixed(2)} m²</td></tr>
+                            <tr><td style={tdStyle}>Total Panels</td><td style={tdStyle}>{(getRoofArea() / solarPanelArea).toFixed(0)}</td></tr>
+                            <tr><td style={tdStyle}>Annual Power Generation</td>
+                                <td style={tdStyle}>
+                                    {roofPanels.reduce((total, panel) =>
+                                        !panel.isDeleted
+                                            ? total + (((panel.area / solarPanelArea) * solarPanelEnergyOutput * 12) / energyConsumption * 100)
+                                            : total
+                                        , 0).toFixed(2)} kWh/year
+                                </td>
                             </tr>
-                            <tr>
-                                <td style={{ border: "1px solid #ddd", padding: "8px" }}>Total Panels to be Used</td>
-                                <td style={{ border: "1px solid #ddd", padding: "8px" }}>{(getRoofArea() / solarPanelArea).toFixed(0)}</td>
-                            </tr>
-                            <tr>
-                                <td style={{ border: "1px solid #ddd", padding: "8px" }}>Annual Power Generation</td>
-                                <td style={{ border: "1px solid #ddd", padding: "8px" }}>{((getRoofArea() / solarPanelArea * solarPanelEnergyOutput * 12)).toFixed(2)} kWh/year</td>
-                            </tr>
-                            {solarData && (
-                                <><tr>
-                                    <td style={{ border: "1px solid #ddd", padding: "8px" }}>Annual Sunshine Hours </td>
-                                    <td style={{ border: "1px solid #ddd", padding: "8px" }}>{solarData.solarPotential.maxSunshineHoursPerYear.toFixed(2)} hours </td>
-                                </tr><tr>
-                                        <td style={{ border: "1px solid #ddd", padding: "8px" }}>CO2 Savings</td>
-                                        <td style={{ border: "1px solid #ddd", padding: "8px" }}>{solarData.solarPotential.carbonOffsetFactorKgPerMwh.toFixed(2)} Kg CO₂/year</td>
-                                    </tr></>
+
+                            {roofPanels.filter(panel => !panel.isDeleted && panel.solarData).length > 0 && (
+                                <>
+                                    <tr>
+                                        <td style={tdStyle}>Average Sunshine Hours</td>
+                                        <td style={tdStyle}>{(
+                                            roofPanels.reduce((sum, panel) =>
+                                                !panel.isDeleted && panel.solarData
+                                                    ? sum + panel.solarData.maxSunshineHoursPerYear
+                                                    : sum, 0) /
+                                            roofPanels.filter(panel => !panel.isDeleted && panel.solarData).length
+                                        ).toFixed(2)} hours</td>
+                                    </tr>
+                                    <tr>
+                                        <td style={tdStyle}>Average CO2 Savings</td>
+                                        <td style={tdStyle}>{(
+                                            roofPanels.reduce((sum, panel) =>
+                                                !panel.isDeleted && panel.solarData
+                                                    ? sum + panel.solarData.carbonOffsetFactorKgPerMwh
+                                                    : sum, 0) /
+                                            roofPanels.filter(panel => !panel.isDeleted && panel.solarData).length
+                                        ).toFixed(2)} Kg CO₂/year</td>
+                                    </tr>
+                                </>
                             )}
                         </tbody>
                     </table>
                 </div>
             </div>
+            <div style={{
+                width: "70%",
+                height: "100vh",
+                position: "relative"
+            }}>
+                <GoogleMap
+                    zoom={zoom}
+                    center={center}
+                    mapContainerStyle={{ width: "100%", height: "100%" }}
+                    options={mapOptions}
+                    onLoad={onLoad}
+                    onClick={(e) => addBoxPoint(e.latLng?.toJSON())}
+                >
+                    {boxPoints.map((coordinates, index) => (
+                        <Marker
+                            key={index}
+                            position={coordinates}
+                            icon={dotIcon}
+                            onClick={() => {
+                                if (index === 0 && boxPoints.length >= 3) {
+                                    addRoofSegmment(boxPoints);
+                                    setBoxPoints([]);
+                                }
+                            }}
+                        />
+                    ))}
+                    {home && <Marker position={home} />}
+                </GoogleMap>
+            </div>
         </div>
+
     );
 }
 

@@ -208,3 +208,9 @@ a {
   transform: scale(1.1);
   z-index: 10;
 }
+
+.tdStyle  {
+  padding: "10px";
+  border: "1px solid #ddd";
+  background: "#fff"
+};
