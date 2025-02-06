@@ -39,6 +39,7 @@ export default function Map() {
             lng: lngSum / boxPoints.length
         };
     };
+    
     const fetchSolarApiData = async () => {
         const center = getSelectedAreaCenter();
         if (!center) return;
@@ -173,70 +174,119 @@ export default function Map() {
             }
         }
 
+        // drawSolarPanelsInTriangle(points) {
+        //     // 1. Identify side with largest vertical component
+        //     let yComponentLengths = [];
+
+        //     points.forEach((point, index) => {
+        //         yComponentLengths.push([]);
+        //         points.map((otherPoint) => {
+        //             yComponentLengths[index].push(Math.abs(point.lat - otherPoint.lat));
+        //         });
+        //     });
+
+        //     let maxVal = 0;
+        //     let maxLine = [{ lat: 0, lng: 0 }, { lat: 0, lng: 0 }];
+
+        //     for (let r = 0; r < yComponentLengths.length; r++) {
+        //         for (let c = 0; c < yComponentLengths.length; c++) {
+        //             if (yComponentLengths[r][c] > maxVal) {
+        //                 maxVal = yComponentLengths[r][c];
+        //                 maxLine[0] = points[r];
+        //                 maxLine[1] = points[c];
+        //             }
+        //         }
+        //     }
+
+        //     // 2. Identify northernmost point on line
+        //     let northMost, southMost;
+        //     if (maxLine[0].lat > maxLine[1].lat) {
+        //         northMost = maxLine[0];
+        //         southMost = maxLine[1];
+        //     } else {
+        //         northMost = maxLine[1];
+        //         southMost = maxLine[0];
+        //     }
+
+        //     let maxLineHeading = window.google.maps.geometry.spherical.computeHeading(northMost, southMost);
+        //     let solarPanelDistanceOnLine = Math.abs((solarPanelHeight * 0.3048) / (Math.cos(((180 - Math.abs(maxLineHeading)) * (Math.PI / 180)))));
+        //     let currPointOnMaxLine = window.google.maps.geometry.spherical.computeOffset(northMost, solarPanelDistanceOnLine, maxLineHeading);
+
+        //     let westOfCurrPointOnMaxLine = window.google.maps.geometry.spherical.computeOffset(currPointOnMaxLine, (solarPanelWidth * 0.3048), 270);
+        //     let eastOfCurrPointOnMaxLine = window.google.maps.geometry.spherical.computeOffset(currPointOnMaxLine, (solarPanelWidth * 0.3048), 90);
+
+        //     let canDrawPanels = true;
+        //     if (window.google.maps.geometry.poly.containsLocation(westOfCurrPointOnMaxLine, this.panel)) {
+        //         while (canDrawPanels) {
+        //             this.drawRowOfPanels(currPointOnMaxLine, CardinalDirection.west);
+        //             let southPointOfNextPanel = window.google.maps.geometry.spherical.computeOffset(currPointOnMaxLine, (2 * solarPanelHeight * 0.3048), 180);
+        //             if (southPointOfNextPanel.lat() - southMost.lat < 0) {
+        //                 canDrawPanels = false;
+        //             }
+        //             currPointOnMaxLine = window.google.maps.geometry.spherical.computeOffset(currPointOnMaxLine, solarPanelDistanceOnLine, maxLineHeading);
+        //         }
+        //     } else if (window.google.maps.geometry.poly.containsLocation(eastOfCurrPointOnMaxLine, this.panel)) {
+        //         while (canDrawPanels) {
+        //             this.drawRowOfPanels(currPointOnMaxLine, CardinalDirection.east);
+        //             let southPointOfNextPanel = window.google.maps.geometry.spherical.computeOffset(currPointOnMaxLine, (2 * solarPanelHeight * 0.3048), 180);
+        //             if (southPointOfNextPanel.lat() - southMost.lat < 0) {
+        //                 canDrawPanels = false;
+        //             }
+        //             currPointOnMaxLine = window.google.maps.geometry.spherical.computeOffset(currPointOnMaxLine, solarPanelDistanceOnLine, maxLineHeading);
+        //         }
+        //     }
+
+        //     return true;
+        // }
+
         drawSolarPanelsInTriangle(points) {
-            // 1. Identify side with largest vertical component
-            let yComponentLengths = [];
-
-            points.forEach((point, index) => {
-                yComponentLengths.push([]);
-                points.map((otherPoint) => {
-                    yComponentLengths[index].push(Math.abs(point.lat - otherPoint.lat));
-                });
-            });
-
+            // 1. Identify the side with the largest vertical component
             let maxVal = 0;
             let maxLine = [{ lat: 0, lng: 0 }, { lat: 0, lng: 0 }];
-
-            for (let r = 0; r < yComponentLengths.length; r++) {
-                for (let c = 0; c < yComponentLengths.length; c++) {
-                    if (yComponentLengths[r][c] > maxVal) {
-                        maxVal = yComponentLengths[r][c];
-                        maxLine[0] = points[r];
-                        maxLine[1] = points[c];
+            
+            for (let i = 0; i < points.length; i++) {
+                for (let j = i + 1; j < points.length; j++) {
+                    let verticalDiff = Math.abs(points[i].lat - points[j].lat);
+                    if (verticalDiff > maxVal) {
+                        maxVal = verticalDiff;
+                        maxLine = [points[i], points[j]];
                     }
                 }
             }
-
-            // 2. Identify northernmost point on line
-            let northMost, southMost;
-            if (maxLine[0].lat > maxLine[1].lat) {
-                northMost = maxLine[0];
-                southMost = maxLine[1];
-            } else {
-                northMost = maxLine[1];
-                southMost = maxLine[0];
-            }
-
+        
+            // 2. Identify northernmost and southernmost points
+            let [northMost, southMost] = maxLine[0].lat > maxLine[1].lat ? [maxLine[0], maxLine[1]] : [maxLine[1], maxLine[0]];
+        
+            // 3. Compute panel placement along the max vertical line
             let maxLineHeading = window.google.maps.geometry.spherical.computeHeading(northMost, southMost);
-            let solarPanelDistanceOnLine = Math.abs((solarPanelHeight * 0.3048) / (Math.cos(((180 - Math.abs(maxLineHeading)) * (Math.PI / 180)))));
-            let currPointOnMaxLine = window.google.maps.geometry.spherical.computeOffset(northMost, solarPanelDistanceOnLine, maxLineHeading);
-
-            let westOfCurrPointOnMaxLine = window.google.maps.geometry.spherical.computeOffset(currPointOnMaxLine, (solarPanelWidth * 0.3048), 270);
-            let eastOfCurrPointOnMaxLine = window.google.maps.geometry.spherical.computeOffset(currPointOnMaxLine, (solarPanelWidth * 0.3048), 90);
-
+            let panelStep = Math.abs((solarPanelHeight * 0.3048) / Math.cos((180 - Math.abs(maxLineHeading)) * (Math.PI / 180)));
+        
+            let currPoint = northMost;
             let canDrawPanels = true;
-            if (window.google.maps.geometry.poly.containsLocation(westOfCurrPointOnMaxLine, this.panel)) {
-                while (canDrawPanels) {
-                    this.drawRowOfPanels(currPointOnMaxLine, CardinalDirection.west);
-                    let southPointOfNextPanel = window.google.maps.geometry.spherical.computeOffset(currPointOnMaxLine, (2 * solarPanelHeight * 0.3048), 180);
-                    if (southPointOfNextPanel.lat() - southMost.lat < 0) {
-                        canDrawPanels = false;
-                    }
-                    currPointOnMaxLine = window.google.maps.geometry.spherical.computeOffset(currPointOnMaxLine, solarPanelDistanceOnLine, maxLineHeading);
+        
+            while (canDrawPanels) {
+                let westOfCurrPoint = window.google.maps.geometry.spherical.computeOffset(currPoint, solarPanelWidth * 0.3048, 270);
+                let eastOfCurrPoint = window.google.maps.geometry.spherical.computeOffset(currPoint, solarPanelWidth * 0.3048, 90);
+        
+                if (window.google.maps.geometry.poly.containsLocation(westOfCurrPoint, this.panel)) {
+                    this.drawRowOfPanels(currPoint, CardinalDirection.west);
+                } else if (window.google.maps.geometry.poly.containsLocation(eastOfCurrPoint, this.panel)) {
+                    this.drawRowOfPanels(currPoint, CardinalDirection.east);
+                } else {
+                    canDrawPanels = false;
                 }
-            } else if (window.google.maps.geometry.poly.containsLocation(eastOfCurrPointOnMaxLine, this.panel)) {
-                while (canDrawPanels) {
-                    this.drawRowOfPanels(currPointOnMaxLine, CardinalDirection.east);
-                    let southPointOfNextPanel = window.google.maps.geometry.spherical.computeOffset(currPointOnMaxLine, (2 * solarPanelHeight * 0.3048), 180);
-                    if (southPointOfNextPanel.lat() - southMost.lat < 0) {
-                        canDrawPanels = false;
-                    }
-                    currPointOnMaxLine = window.google.maps.geometry.spherical.computeOffset(currPointOnMaxLine, solarPanelDistanceOnLine, maxLineHeading);
+        
+                // Move to the next row
+                let nextRowPoint = window.google.maps.geometry.spherical.computeOffset(currPoint, 2 * solarPanelHeight * 0.3048, 180);
+                if (nextRowPoint.lat < southMost.lat) {
+                    canDrawPanels = false;
                 }
+                currPoint = nextRowPoint;
             }
-
+        
             return true;
         }
+        
 
         getLngOnLine(startPoint, endPoint, targetLat) {
             return (targetLat - startPoint.lat) * ((endPoint.lng - startPoint.lng) / (endPoint.lat - startPoint.lat)) + startPoint.lng;
@@ -518,10 +568,6 @@ export default function Map() {
                                         </tr>
                                     </tbody>
                                 </table>
-
-                                {panel.points.length === 3 && (
-                                    <p>Panels: {panel.solarPanels.length} solar panels</p>
-                                )}
                                 <button onClick={() => panel.delete()} style={{
                                     padding: "5px 10px",
                                     background: "#dc3545",
