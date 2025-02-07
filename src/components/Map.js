@@ -84,19 +84,29 @@ export default function Map() {
     }), []);
 
     const onLoad = useCallback((map) => (mapRef.current = map), []);
-
+    
+    const sniperPointSvg = `
+    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Background circle with border only -->
+        <circle cx="5" cy="5" r="5" stroke="#FF0000" stroke-width="1.5" fill="none" />
+        <!-- Crosshair lines -->
+        <line x1="5" y1="0" x2="5" y2="10" stroke="#FF0000" stroke-width="1.5" />
+        <line x1="0" y1="5" x2="10" y2="5" stroke="#FF0000" stroke-width="1.5" />
+        <!-- Center dot -->
+        <circle cx="5" cy="5" r="1" fill="#FF0000"/>
+    </svg>`;
+    
     const dotIcon = {
-        url: "https://www.wsfcu.com/wp-content/uploads/Decorative-Orange-Box-Slider.jpg",
-        scaledSize: new window.google.maps.Size(10, 10), // scaled size
-        origin: new window.google.maps.Point(0, 0), // origin
-        anchor: new window.google.maps.Point(5, 5) // anchor
+        url: `data:image/svg+xml,${encodeURIComponent(sniperPointSvg)}`,
+        scaledSize: new window.google.maps.Size(10, 10),
+        origin: new window.google.maps.Point(0, 0),
+        anchor: new window.google.maps.Point(5, 5)
     };
-
     // Handle creating and drawing the current Polyline
     const [boxPoints, setBoxPoints] = useState([]);
     const currPolyline = useRef();
     
-    const MIN_DISTANCE = 2;
+    const MIN_DISTANCE = 3.5;
     let addBoxPoint = (coordinates) => {
         if (boxPoints.length === 0) {
             setBoxPoints([coordinates]);
@@ -122,6 +132,7 @@ export default function Map() {
                 path: boxPoints,
                 geodesic: false,
                 strokeColor: "#FF0000",
+                strokeWeight: 1, // Add this line here to set the stroke width to 1 pixel
             });
             newPolyline.setMap(mapRef.current);
             // newPolyline.addListener('click', () => {newPolyline.setMap(null);})
@@ -167,7 +178,7 @@ export default function Map() {
             const panel = new window.google.maps.Polygon({
                 paths: points,
                 strokeOpacity: 0.8,
-                strokeWeight: 2,
+                strokeWeight: 1,
                 fillOpacity: 0.35,
             });
             panel.setMap(mapRef.current);
