@@ -12,6 +12,10 @@ const latLngLiteral = {
 const mapOptions = {
     center: latLngLiteral,
     zoom: 6,
+    disableDefaultUI: false,
+    clickableIcons: false,
+    mapTypeControl: false,
+    mapTypeId: 'hybrid',
 };
 
 
@@ -47,6 +51,7 @@ export default function Map() {
         try {
             const response = await fetch(url);
             const data = await response.json();
+            console.log("Panel Data", data);
             if (data?.properties?.parameter?.ALLSKY_SFC_SW_DWN?.ANN) {
                 const annualIrradiance = data.properties.parameter.ALLSKY_SFC_SW_DWN.ANN; // kWh/m²/day
                 if (typeof annualIrradiance === "number" && !isNaN(annualIrradiance)) {
@@ -62,6 +67,7 @@ export default function Map() {
         }
     };
     
+
     const [home, setHome] = useState();
     useEffect(() => {
         if (home) {
@@ -84,7 +90,7 @@ export default function Map() {
     }), []);
 
     const onLoad = useCallback((map) => (mapRef.current = map), []);
-    
+
     const sniperPointSvg = `
     <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
         <!-- Background circle with border only -->
@@ -95,7 +101,7 @@ export default function Map() {
         <!-- Center dot -->
         <circle cx="5" cy="5" r="1" fill="#FF0000"/>
     </svg>`;
-    
+
     const dotIcon = {
         url: `data:image/svg+xml,${encodeURIComponent(sniperPointSvg)}`,
         scaledSize: new window.google.maps.Size(10, 10),
@@ -105,7 +111,7 @@ export default function Map() {
     // Handle creating and drawing the current Polyline
     const [boxPoints, setBoxPoints] = useState([]);
     const currPolyline = useRef();
-    
+
     const MIN_DISTANCE = 3.5;
     let addBoxPoint = (coordinates) => {
         if (boxPoints.length === 0) {
@@ -116,7 +122,7 @@ export default function Map() {
                 new window.google.maps.LatLng(lastPoint),
                 new window.google.maps.LatLng(coordinates)
             );
-            
+
             if (distance > MIN_DISTANCE) {
                 setBoxPoints([...boxPoints, coordinates]);
             }
@@ -188,6 +194,7 @@ export default function Map() {
             this.area = window.google.maps.geometry.spherical.computeArea(points) * 10.7639; // convert square meters to square feet
             this.index = index;
             this.points = points;
+            this.displaySideLengths();
             this.solarData = solarData;
             this.panel = panel;
 
@@ -358,13 +365,60 @@ export default function Map() {
             }
         }
 
+        // Within the roofPanel class or similar function
+        calculateSideLengths() {
+            const lengths = this.points.map((point, index, array) => {
+                const nextIndex = (index + 1) % array.length;
+                return window.google.maps.geometry.spherical.computeDistanceBetween(
+                    new window.google.maps.LatLng(point),
+                    new window.google.maps.LatLng(array[nextIndex])
+                );
+            });
+            return lengths; // Array of lengths for each side
+        }
 
+        displaySideLengths() {
+            const lengths = this.calculateSideLengths();
+            lengths.forEach((length, index) => {
+                const startPoint = this.points[index];
+                const endPoint = this.points[(index + 1) % this.points.length];
+                const midPoint = {
+                    lat: (startPoint.lat + endPoint.lat) / 2,
+                    lng: (startPoint.lng + endPoint.lng) / 2
+                };
+                // Create a marker or custom SVG for showing length
+                const label = new window.google.maps.Marker({
+                    position: midPoint,
+                    map: mapRef.current,
+                    label: {
+                        text: `${Math.round(length)} m`, // Convert to feet if needed
+                        color: "white",
+                        fontSize: "12px",
+                        fontWeight: "bold",
+                        className: "custom-label" // For styling
+                    },
+                    icon: {
+                        url: 'data:image/svg+xml;charset=UTF-8,' + 
+                             encodeURIComponent('<svg width="0" height="0"></svg>'),
+                        scaledSize: new window.google.maps.Size(0, 0)
+                    }
+                });
+                // Store the markers for cleanup if panel is deleted
+                this.sideLabels = this.sideLabels || [];
+                this.sideLabels.push(label);
+            });
+        }
+
+        // Then display these lengths somehow, perhaps in an info window or on the map
         delete() {
             this.isDeleted = true;
             this.panel.setMap(null);
             this.solarPanels.map((panel) => {
                 panel.setMap(null);
             });
+            if (this.sideLabels) {
+                this.sideLabels.forEach(label => label.setMap(null));
+            }
             setDeletedPanels(deletedPanels => [...deletedPanels, this.index]);
         }
 
