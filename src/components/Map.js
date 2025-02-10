@@ -4,21 +4,6 @@ import Places from "./Places";
 import React from "react";
 import "./styles.css";
 
-const latLngLiteral = {
-    lat: 51.1657,
-    lng: 10.4515
-};
-
-const mapOptions = {
-    center: latLngLiteral,
-    zoom: 6,
-    disableDefaultUI: false,
-    clickableIcons: false,
-    mapTypeControl: false,
-    mapTypeId: 'hybrid',
-};
-
-
 
 export default function Map() {
     const [energyConsumption, setEnergyConsumption] = useState(900);
@@ -29,7 +14,6 @@ export default function Map() {
 
     const [zoom, setZoom] = useState(12);
     const [panelHovering, setPanelHovering] = useState();
-    const [solarData, setSolarData] = useState(null); //
 
     const getSelectedAreaCenter = () => {
         if (boxPoints.length === 0) return null;
@@ -66,7 +50,7 @@ export default function Map() {
             return null;
         }
     };
-    
+
 
     const [home, setHome] = useState();
     useEffect(() => {
@@ -79,14 +63,22 @@ export default function Map() {
     const mapRef = useRef();
     const center = useMemo(() => ({ lat: 29.425319, lng: -98.492733 }), []);
 
+
+    const latLngLiteral = {
+        lat: 51.1657,
+        lng: 10.4515
+    };
+
     const options = useMemo(() => ({
+        center: latLngLiteral,
         mapId: "793ef8405dde11b1",
-        disableDefaultUI: true,
+        zoom: 6,
+        disableDefaultUI: false,
         clickableIcons: false,
-        rotateControl: false,
-        tilt: 0,
+        mapTypeControl: false,
         mapTypeId: 'hybrid',
-        draggableCursor: 'crosshair',
+        tilt: 0,
+        draggableCursor: 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'24\' height=\'24\' viewBox=\'0 0 24 24\'><path d=\'M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z\' fill=\'%23000\'/></svg>") 12 12, auto',
     }), []);
 
     const onLoad = useCallback((map) => (mapRef.current = map), []);
@@ -398,8 +390,8 @@ export default function Map() {
                         className: "custom-label" // For styling
                     },
                     icon: {
-                        url: 'data:image/svg+xml;charset=UTF-8,' + 
-                             encodeURIComponent('<svg width="0" height="0"></svg>'),
+                        url: 'data:image/svg+xml;charset=UTF-8,' +
+                            encodeURIComponent('<svg width="0" height="0"></svg>'),
                         scaledSize: new window.google.maps.Size(0, 0)
                     }
                 });
@@ -643,7 +635,7 @@ export default function Map() {
                     zoom={zoom}
                     center={center}
                     mapContainerStyle={{ width: "100%", height: "100%" }}
-                    options={mapOptions}
+                    options={options}
                     onLoad={onLoad}
                     onClick={(e) => addBoxPoint(e.latLng?.toJSON())}
                 >
@@ -667,6 +659,4 @@ export default function Map() {
 
     );
 }
-
-
 
