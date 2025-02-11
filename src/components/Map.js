@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { GoogleMap, Marker } from "@react-google-maps/api";
 import Places from "./Places";
 import React from "react";
+import { jsPDF } from "jspdf";
 import "./styles.css";
 
 
@@ -451,6 +452,94 @@ export default function Map() {
         return area;
     }
 
+
+    const downloadPDF = (panelIndex) => {
+        const input = document.getElementById('map-container');
+        if (input && roofPanels.length > panelIndex) {
+            const panel = roofPanels[panelIndex];
+
+            const sketchCanvas = document.createElement('canvas');
+            const sketchCtx = sketchCanvas.getContext('2d');
+
+            sketchCanvas.width = input.clientWidth;
+            sketchCanvas.height = input.clientHeight;
+
+            let panelCenter = { x: 0, y: 0 };
+            const mapBounds = mapRef.current.getBounds();
+            const ne = mapBounds.getNorthEast();
+            const sw = mapBounds.getSouthWest();
+            const mapWidth = ne.lng() - sw.lng();
+            const mapHeight = ne.lat() - sw.lat();
+
+            panel.points.forEach((point) => {
+                const xRatio = (point.lng - sw.lng()) / mapWidth;
+                const yRatio = (ne.lat() - point.lat) / mapHeight;
+                panelCenter.x += xRatio * sketchCanvas.width;
+                panelCenter.y += yRatio * sketchCanvas.height;
+            });
+            panelCenter.x /= panel.points.length;
+            panelCenter.y /= panel.points.length;
+
+            sketchCtx.translate(sketchCanvas.width / 2 - panelCenter.x, sketchCanvas.height / 2 - panelCenter.y);
+            sketchCtx.clearRect(-sketchCanvas.width / 2, -sketchCanvas.height / 2, sketchCanvas.width, sketchCanvas.height);
+
+            sketchCtx.beginPath();
+            panel.points.forEach((point, index) => {
+                const xRatio = (point.lng - sw.lng()) / mapWidth;
+                const yRatio = (ne.lat() - point.lat) / mapHeight;
+
+                const canvasX = xRatio * sketchCanvas.width;
+                const canvasY = yRatio * sketchCanvas.height;
+
+                if (index === 0) {
+                    sketchCtx.moveTo(canvasX, canvasY);
+                } else {
+                    sketchCtx.lineTo(canvasX, canvasY);
+                }
+            });
+            sketchCtx.closePath();
+            sketchCtx.fillStyle = "rgba(0, 0, 255, 0.4)"; // Blue with transparency
+            sketchCtx.strokeStyle = "rgba(0, 0, 255, 1)"; // Blue outline
+            sketchCtx.lineWidth = 2;
+            sketchCtx.fill();
+            sketchCtx.stroke();
+            const sketchImg = sketchCanvas.toDataURL('image/png');
+            const pdf = new jsPDF('l', 'pt', [sketchCanvas.width, sketchCanvas.height]);
+            pdf.addImage(sketchImg, 'PNG', 0, 0, sketchCanvas.width, sketchCanvas.height);
+            pdf.text(20, 20, `Roof Area: ${(panel.area * 0.092903).toFixed(2)} m²`);
+            const sideLengths = panel.calculateSideLengths();
+            sideLengths.forEach((length, index) => {
+                let sideName = `Side ${String.fromCharCode(65 + index)}${String.fromCharCode(65 + ((index + 1) % sideLengths.length))}`;
+                pdf.text(20, 40 + index * 20, `${sideName}: ${Math.round(length)} m`);
+            });
+            sideLengths.forEach((_, index) => {
+                const point = panel.points[index];
+                const xRatio = (point.lng - sw.lng()) / mapWidth;
+                const yRatio = (ne.lat() - point.lat) / mapHeight;
+
+                let canvasX = xRatio * sketchCanvas.width - panelCenter.x + sketchCanvas.width / 2;
+                let canvasY = yRatio * sketchCanvas.height - panelCenter.y + sketchCanvas.height / 2;
+
+                const pdfX = Math.max(0, Math.min(canvasX, pdf.internal.pageSize.getWidth()));
+                const pdfY = Math.max(0, Math.min(canvasY, pdf.internal.pageSize.getHeight()));
+
+                const text = String.fromCharCode(65 + index);
+
+                if (pdfX >= 0 && pdfY >= 0 && pdfX <= pdf.internal.pageSize.getWidth() && pdfY <= pdf.internal.pageSize.getHeight()) {
+                    pdf.setFontSize(20);
+                    pdf.setTextColor(255, 255, 255);
+                    pdf.setDrawColor(0);
+                    pdf.setFillColor(0, 0, 0);
+                    pdf.rect(pdfX - 10, pdfY - 10, 20, 20, 'F');
+                    pdf.text(text, pdfX, pdfY, { align: 'center', baseline: 'middle' });
+                }
+            });
+            pdf.save(`solar_panel_layout_panel_${panelIndex + 1}.pdf`);
+        } else {
+            console.error("Element with ID 'map-container' not found or invalid panel index");
+        }
+    };
+    
     const tdStyle = {
         padding: "10px",
         border: "1px solid black",
@@ -555,9 +644,20 @@ export default function Map() {
                                     color: "white",
                                     border: "none",
                                     borderRadius: "4px",
-                                    cursor: "pointer"
+                                    cursor: "pointer",
+                                    marginRight: "10px"
                                 }}>
                                     Delete
+                                </button>
+                                <button onClick={() => downloadPDF(index)} style={{ // Here we pass the index
+                                    padding: "5px 10px",
+                                    background: "blue",
+                                    color: "white",
+                                    border: "none",
+                                    borderRadius: "4px",
+                                    cursor: "pointer",
+                                }}>
+                                    Download PDF
                                 </button>
                             </details>
                         ) : null
@@ -632,6 +732,7 @@ export default function Map() {
                 position: "relative"
             }}>
                 <GoogleMap
+                    id="map-container"
                     zoom={zoom}
                     center={center}
                     mapContainerStyle={{ width: "100%", height: "100%" }}
@@ -656,7 +757,6 @@ export default function Map() {
                 </GoogleMap>
             </div>
         </div>
-
     );
 }
 
