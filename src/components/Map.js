@@ -3,6 +3,7 @@ import { GoogleMap, Marker } from "@react-google-maps/api";
 import Places from "./Places";
 import React from "react";
 import { jsPDF } from "jspdf";
+import html2canvas from 'html2canvas';
 import "./styles.css";
 
 
@@ -79,7 +80,7 @@ export default function Map() {
         mapTypeControl: false,
         mapTypeId: 'hybrid',
         tilt: 0,
-        draggableCursor: 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'24\' height=\'24\' viewBox=\'0 0 24 24\'><path d=\'M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z\' fill=\'%23000\'/></svg>") 12 12, auto',
+        draggableCursor: 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'24\' height=\'24\' viewBox=\'0 0 24 24\'><circle cx=\'12\' cy=\'12\' r=\'6\' fill=\'%2300FFFF\' stroke=\'%23000000\' stroke-width=\'2\'/></svg>") 12 12, auto',
     }), []);
 
     const onLoad = useCallback((map) => (mapRef.current = map), []);
@@ -104,23 +105,15 @@ export default function Map() {
     // Handle creating and drawing the current Polyline
     const [boxPoints, setBoxPoints] = useState([]);
     const currPolyline = useRef();
-
-    const MIN_DISTANCE = 3.5;
+    
     let addBoxPoint = (coordinates) => {
         if (boxPoints.length === 0) {
             setBoxPoints([coordinates]);
         } else {
-            const lastPoint = boxPoints[boxPoints.length - 1];
-            const distance = window.google.maps.geometry.spherical.computeDistanceBetween(
-                new window.google.maps.LatLng(lastPoint),
-                new window.google.maps.LatLng(coordinates)
-            );
-
-            if (distance > MIN_DISTANCE) {
-                setBoxPoints([...boxPoints, coordinates]);
-            }
+            setBoxPoints([...boxPoints, coordinates]);
         }
     };
+
 
     useEffect(() => {
         if (boxPoints.length >= 2) {
