@@ -45,13 +45,32 @@ const Places = ({ setHome }) => {
           style={{
             display: "flex",
             alignItems: "center",
-            background: "rgba(255, 255, 255, 0.9)",
+            background: "linear-gradient(135deg, #0D5E6B 10%, #0A3A45 100%)",
             padding: "10px 14px",
             borderRadius: "8px",
-            border: "1.5px solid black",
+            color: "#E2CAA2",
+            border: "1.5px solid #E2CAA2",
             width: "100%",
+            transition: "border-color 0.3s ease-in-out",
+            outline: "none",
           }}
         />
+        <style>
+          {`
+            .combobox-input {
+              background: linear-gradient(135deg, #0D5E6B 10%, #0A3A45 100%) !important;
+            }
+            .combobox-input::placeholder {
+              color: #B8A48A;
+              opacity: 0.8;
+            }
+            .combobox-input:focus {
+              background: linear-gradient(135deg, #0D5E6B 10%, #0A3A45 100%) !important;
+              border-color: #E2CAA2 !important;
+              outline: none;
+            }
+          `}
+        </style>
       </div>
       <ComboboxPopover>
         <ComboboxList
@@ -74,7 +93,6 @@ const Places = ({ setHome }) => {
     </Combobox>
   );
 };
-
 
 Places.propTypes = {
   setHome: PropTypes.func.isRequired,
