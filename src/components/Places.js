@@ -41,7 +41,7 @@ const Places = ({ setHome }) => {
           onChange={(e) => setValue(e.target.value)}
           disabled={!ready}
           className="combobox-input"
-          placeholder="Search your location..."
+          placeholder="Adresse eingeben"
           style={{
             display: "flex",
             alignItems: "center",

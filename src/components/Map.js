@@ -1,16 +1,43 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { GoogleMap, Marker } from "@react-google-maps/api";
-import Places from "./Places";
+import Sidebar from "./Sidebar";
 import React from "react";
 import { jsPDF } from "jspdf";
 import "./styles.css";
+import {
+    Box,
+    Typography,
+    Button,
+    Modal,
+    Fade,
+} from "@mui/material";
 
-export default function Map() {
+export default function Map({ currentPage }) {
     const [energyConsumption, setEnergyConsumption] = useState(900);
-    const solarPanelWidth = 3.5; 
+    const [canDrawPanels, setCanDrawPanels] = useState(false);
+    const [resetDrawingState, setResetDrawingState] = useState(false);
+    const [homePosition, setHomePosition] = useState(null);
+    const [areaType, setAreaType] = useState("Roof");
+    const solarPanelWidth = 3.5;
     const solarPanelHeight = 5;
     const solarPanelArea = solarPanelWidth * solarPanelHeight;
     const solarPanelEnergyOutput = 48;
+
+    // Modal state
+    const [modalOpen, setModalOpen] = useState(false);
+    const [modalMessage, setModalMessage] = useState("");
+
+    const handleOpenModal = (message) => {
+        setModalMessage(message);
+        setModalOpen(true);
+    };
+
+    const handleCloseModal = () => {
+        setModalOpen(false);
+        setModalMessage("");
+    };
+
+
 
     const [zoom, setZoom] = useState(12);
     const [panelHovering, setPanelHovering] = useState();
@@ -82,6 +109,7 @@ export default function Map() {
     );
 
     const onLoad = useCallback((map) => (mapRef.current = map), []);
+
     const sniperPointSvg = `
     <svg width="6" height="6" viewBox="0 0 6 6" fill="none" xmlns="http://www.w3.org/2000/svg">
         <circle cx="3" cy="3" r="2.5" stroke="#FF0000" stroke-width="1" fill="none" />
@@ -89,8 +117,6 @@ export default function Map() {
         <line x1="0" y1="3" x2="6" y2="3" stroke="#FF0000" stroke-width="1" />
         <circle cx="3" cy="3" r="0.8" fill="#FF0000"/>
     </svg>`;
-
-
 
     const dotIcon = {
         url: `data:image/svg+xml,${encodeURIComponent(sniperPointSvg)}`,
@@ -102,7 +128,115 @@ export default function Map() {
     const [boxPoints, setBoxPoints] = useState([]);
     const currPolyline = useRef();
 
-    let addBoxPoint = (coordinates) => {
+    const getGeocodingTypes = async (latLng) => {
+        return new Promise((resolve) => {
+            const geocoder = new window.google.maps.Geocoder();
+            geocoder.geocode({ location: latLng }, (results, status) => {
+                if (status === "OK" && results[0]) {
+                    resolve(results[0].types);
+                } else {
+                    resolve(["Geocoding Failed"]);
+                }
+            });
+        });
+    };
+
+    const checkLocationType = async (latLng) => {
+        return new Promise((resolve) => {
+            const geocoder = new window.google.maps.Geocoder();
+            geocoder.geocode({ location: latLng }, (results, status) => {
+                if (status === "OK" && results[0]) {
+                    const types = results[0].types;
+                    const roofTypes = [
+                        "premise",
+                        "building",
+                        "roof",
+                        "street_address",
+                        "sublocality",
+                        "locality",
+                        "neighborhood",
+                        "postal_code",
+                        "store",
+                        "car_repair",
+                    ];
+
+                    const openAreaTypes = [
+                        "park",
+                        "natural_feature",
+                        "forest",
+                        "grassland",
+                        "field",
+                        "meadow",
+                        "tourist_attraction",
+                        "route",
+                    ];
+
+                    if (
+                        types.length === 2 &&
+                        types.includes("establishment") &&
+                        types.includes("point_of_interest")
+                    ) {
+                        resolve("Roof");
+                    } else if (types.length > 2 && types.includes("establishment") && types.includes("point_of_interest")) {
+                        const additionalTypes = types.filter(
+                            (type) => type !== "establishment" && type !== "point_of_interest"
+                        );
+                        if (roofTypes.some((type) => additionalTypes.includes(type))) {
+                            resolve("Roof");
+                        } else if (openAreaTypes.some((type) => additionalTypes.includes(type))) {
+                            resolve("Open Area");
+                        } else {
+                            resolve("Roof");
+                        }
+                    } else {
+                        if (roofTypes.some((type) => types.includes(type))) {
+                            resolve("Roof");
+                        } else if (openAreaTypes.some((type) => types.includes(type))) {
+                            resolve("Open Area");
+                        } else {
+                            // Fallback to address components if no direct match
+                            const components = results[0].address_components;
+                            const hasInfrastructure = components.some((comp) =>
+                                ["street_number", "route", "premise", "building"].includes(comp.types[0])
+                            );
+                            if (hasInfrastructure) {
+                                resolve("Roof");
+                            } else {
+                                resolve("Open Area");
+                            }
+                        }
+                    }
+                } else {
+                    resolve("Roof");
+                }
+            });
+        });
+    };
+
+    let addBoxPoint = async (coordinates) => {
+        if (!homePosition) {
+            return;
+        }
+        if (currentPage === "config" && roofPanels.length > 0 && !canDrawPanels) {
+            return;
+        }
+        if (!canDrawPanels) {
+            return;
+        }
+
+        const locationType = await checkLocationType(coordinates);
+        console.log("Geocoding Types for Clicked Location:", await getGeocodingTypes(coordinates)); // Log the raw types
+        console.log("Determined Location Type:", locationType);
+
+        if (
+            (areaType === "Roof" && locationType !== "Roof") ||
+            (areaType === "Open Area" && locationType !== "Open Area") ||
+            (areaType !== "Both" && locationType === "Unknown")
+        ) {
+            handleOpenModal(`Please select a ${areaType.toLowerCase()} area. Current selection is ${locationType}.`);
+            return;
+        }
+
         if (boxPoints.length === 0) {
             setBoxPoints([coordinates]);
         } else {
@@ -182,10 +316,8 @@ export default function Map() {
             });
             polyline.setMap(mapRef.current);
 
-            // Calculate the center of the polygon for the label
             const center = this.calculateCenter(points);
 
-            // Add the panel number label at the center
             this.numberLabel = new window.google.maps.Marker({
                 position: center,
                 map: mapRef.current,
@@ -196,7 +328,7 @@ export default function Map() {
                     fontWeight: "bold",
                 },
                 icon: {
-                    url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent('<svg width="0" height="0"></svg>'), // Invisible icon
+                    url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent('<svg width="0" height="0"></svg>'),
                     scaledSize: new window.google.maps.Size(0, 0),
                 },
             });
@@ -357,7 +489,6 @@ export default function Map() {
                     break;
             }
         }
-
         getFillColor(sunshineHours) {
             if (sunshineHours < 500) {
                 return "#FFFFFF";
@@ -380,7 +511,7 @@ export default function Map() {
                     strokeColor: color,
                 });
                 this.polyline.setOptions({
-                    strokeColor: color, // Update polyline to match area color
+                    strokeColor: color,
                 });
             }
         }
@@ -442,7 +573,6 @@ export default function Map() {
             };
         }
 
-        // Update delete method to hide the label
         delete() {
             this.isDeleted = true;
             this.panel.setMap(null);
@@ -451,27 +581,25 @@ export default function Map() {
             if (this.sideLabels) {
                 this.sideLabels.forEach((label) => label.setMap(null));
             }
-            this.numberLabel.setMap(null); // Hide the number label
+            this.numberLabel.setMap(null);
             setDeletedPanels((deletedPanels) => [...deletedPanels, this.index]);
         }
 
-        // Update addBack method to show the label again
         addBack() {
             this.isDeleted = false;
             this.panel.setMap(mapRef.current);
             this.polyline.setMap(mapRef.current);
             this.solarPanels.forEach((panel) => panel.setMap(mapRef.current));
-            this.numberLabel.setMap(mapRef.current); // Show the number label
+            this.numberLabel.setMap(mapRef.current);
             setDeletedPanels((deletedPanels) => deletedPanels.filter((item) => item !== this.index));
         }
 
-        // Update points and reposition the label
         updatePoints(newPoints, finalize = false) {
             this.points = newPoints;
             this.polyline.setOptions({ path: [...newPoints, newPoints[0]] });
             this.panel.setOptions({ paths: newPoints });
             const newCenter = this.calculateCenter(newPoints);
-            this.numberLabel.setPosition(newCenter); // Reposition the label
+            this.numberLabel.setPosition(newCenter);
             if (finalize) {
                 this.area = window.google.maps.geometry.spherical.computeArea(newPoints) * 10.7639;
                 this.solarPanels.forEach((panel) => panel.setMap(null));
@@ -483,12 +611,19 @@ export default function Map() {
     }
 
     let addRoofSegmment = async (points) => {
+        if (!homePosition) {
+            handleOpenModal("Please search for a location in the sidebar before adding roof segments.");
+            return;
+        }
         let index = roofPanels.length;
         const center = getSelectedAreaCenter(points);
         if (center) {
             const newPanel = new roofPanel(points, index, null);
             setRoofPanels([...roofPanels, newPanel]);
             setBoxPoints([]);
+            setCanDrawPanels(false);
+            setResetDrawingState(true);
+            setTimeout(() => setResetDrawingState(false), 0);
             const solarData = await fetchSolarApiData(center);
             if (solarData) {
                 newPanel.solarData = solarData;
@@ -608,6 +743,34 @@ export default function Map() {
         }
     };
 
+    const resetMapState = () => {
+        // Clear all existing map objects
+        roofPanels.forEach((panel) => {
+            if (!panel.isDeleted) {
+                panel.panel.setMap(null);
+                panel.polyline.setMap(null);
+                panel.solarPanels.forEach((solarPanel) => solarPanel.setMap(null));
+                panel.sideLabels.forEach((label) => label.setMap(null));
+                panel.numberLabel.setMap(null);
+            }
+        });
+
+        if (currPolyline.current) {
+            currPolyline.current.setMap(null);
+        }
+
+        // Reset all state
+        setRoofPanels([]);
+        setBoxPoints([]);
+        setDeletedPanels([]);
+        setCanDrawPanels(false);
+        setResetDrawingState(true);
+        setHomePosition(null);
+        setHome(null);
+        setZoom(12);
+        setTimeout(() => setResetDrawingState(false), 0);
+    };
+
     const tdStyle = {
         padding: "10px",
         border: "1px solid #E2CAA2",
@@ -615,270 +778,30 @@ export default function Map() {
 
     return (
         <div style={{ display: "flex", height: "100vh", width: "100%" }}>
-            <div
-                style={{
-                    width: "30%",
-                    height: "100vh",
-                    overflowY: "auto",
-                    background: "linear-gradient(135deg, #06242E 10%, #073845 100%)",
-                    padding: "20px",
-                    boxShadow: "4px 0 10px rgba(0, 0, 0, 0.1)",
-                    color: "#E2CAA2",
+            <Sidebar
+                roofPanels={roofPanels}
+                solarPanelArea={solarPanelArea}
+                solarPanelEnergyOutput={solarPanelEnergyOutput}
+                energyConsumption={energyConsumption}
+                getRoofArea={getRoofArea}
+                downloadPDF={downloadPDF}
+                setHome={(position) => {
+                    setHomePosition(position);
+                    setHome(position);
                 }}
-            >
-                <div
-                    style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                        marginBottom: "20px",
-                    }}
-                >
-                    <span style={{ fontSize: "40px", color: "#B3D9E1" }}>🔆</span>
-                    <div>
-                        <h1 style={{ fontSize: "22px", fontWeight: "700", color: "#E2CAA2", margin: "0" }}>Solar Roof</h1>
-                        <h2 style={{ fontSize: "18px", fontWeight: "600", color: "#E2CAA2", margin: "0" }}>Panel Calculator</h2>
-                    </div>
-                </div>
-                <Places
-                    setHome={(position) => {
-                        setHome(position);
-                        mapRef.current?.panTo(position);
-                        mapRef.current?.setZoom(15);
-                    }}
-                />
-                <div
-                    style={{
-                        background: "linear-gradient(135deg, #073845 10%, #085B6B 100%)",
-                        padding: "15px",
-                        borderRadius: "8px",
-                        boxShadow: "0 2px 6px rgba(0, 0, 0, 0.1)",
-                        marginTop: "20px",
-                    }}
-                >
-                    <h2>Drawn Panels</h2>
-                    <p style={{ fontSize: "14px", color: "#E2CAA2", }}>
-                        Draw polygons over south, east, and west-facing sections of your roof.
-                    </p>
-                    {roofPanels.map(
-                        (panel, index) =>
-                            !panel.isDeleted && (
-                                <details
-                                    key={index}
-                                    style={{
-                                        background: "linear-gradient(135deg, #0D5E6B 10%, #0A3A45 100%)",
-                                        padding: "10px",
-                                        borderRadius: "5px",
-                                        marginTop: "5px",
-                                        boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-                                        cursor: "pointer",
-                                    }}
-                                >
-                                    <summary
-                                        style={{
-                                            listStyle: "none",
-                                            fontWeight: "bold",
-                                            display: "flex",
-                                            justifyContent: "space-between",
-                                            alignItems: "center",
-                                        }}
-                                    >
-                                        <span>Panel {index + 1}</span>
-                                        <span style={{ fontSize: "1.2em" }}>▼</span>
-                                    </summary>
-                                    <table
-                                        style={{
-                                            width: "100%",
-                                            borderCollapse: "collapse",
-                                            marginTop: "10px",
-                                            marginBottom: "10px",
-                                            textAlign: "left",
-                                            border: "1px solid #E2CAA2",
-                                            color: "#E2CAA2"
-                                        }}
-                                    >
-                                        <thead>
-                                            <tr style={{ background: "#085B6B", color: "#E2CAA2" }}>
-                                                <th style={{ padding: "10px", border: "1px solid #E2CAA2" }}>Property</th>
-                                                <th style={{ padding: "10px", border: "1px solid #E2CAA2" }}>Value</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <td style={tdStyle}>Roof Area</td>
-                                                <td style={tdStyle}>{(panel.area * 0.092903).toFixed(2)} m²</td>
-                                            </tr>
-                                            <tr>
-                                                <td style={tdStyle}>Solar Panels</td>
-                                                <td style={tdStyle}>{(panel.area / solarPanelArea).toFixed(0)}</td>
-                                            </tr>
-                                            <tr>
-                                                <td style={tdStyle}>Power Generation</td>
-                                                <td style={tdStyle}>
-                                                    {((panel.area / solarPanelArea * solarPanelEnergyOutput * 12) / energyConsumption * 100).toFixed(2)} kWh/year
-                                                </td>
-                                            </tr>
-                                            {panel.solarData ? (
-                                                <>
-                                                    <tr>
-                                                        <td style={tdStyle}>Sunshine Hours</td>
-                                                        <td style={tdStyle}>{panel.solarData.maxSunshineHoursPerYear.toFixed(2)} hours</td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td style={tdStyle}>Solar Irradiation</td>
-                                                        <td style={tdStyle}>{(panel.solarData.maxSunshineHoursPerYear / 365).toFixed(2)} kWh/m²/day</td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td style={tdStyle}>CO2 Savings</td>
-                                                        <td style={tdStyle}>{panel.solarData.carbonOffsetFactorKgPerMwh.toFixed(2)} Kg CO₂/year</td>
-                                                    </tr>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <tr>
-                                                        <td style={tdStyle}>Sunshine Hours</td>
-                                                        <td style={tdStyle}>Fetching...</td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td style={tdStyle}>CO2 Savings</td>
-                                                        <td style={tdStyle}>Fetching...</td>
-                                                    </tr>
-                                                </>
-                                            )}
-                                        </tbody>
-                                    </table>
-                                    <button
-                                        onClick={() => panel.delete()}
-                                        style={{
-                                            padding: "5px 10px",
-                                            background: "#dc3545",
-                                            color: "white",
-                                            border: "none",
-                                            borderRadius: "4px",
-                                            cursor: "pointer",
-                                            marginRight: "10px",
-                                        }}
-                                    >
-                                        Delete
-                                    </button>
-                                    <button
-                                        onClick={() => downloadPDF(index)}
-                                        style={{
-                                            padding: "5px 10px",
-                                            background: "blue",
-                                            color: "white",
-                                            border: "none",
-                                            borderRadius: "4px",
-                                            cursor: "pointer",
-                                        }}
-                                    >
-                                        Download PDF
-                                    </button>
-                                </details>
-                            )
-                    )}
-                </div>
-
-                <div
-                    style={{
-                        background: "linear-gradient(135deg, #073845 10%, #085B6B 100%)",
-                        padding: "15px",
-                        borderRadius: "8px",
-                        boxShadow: "0 2px 6px rgba(0, 0, 0, 0.2)",
-                        marginTop: "20px",
-                    }}
-                >
-                    <h2>Summary</h2>
-                    <table
-                        style={{
-                            width: "100%",
-                            borderCollapse: "collapse",
-                            marginBottom: "10px",
-                            textAlign: "left",
-                            border: "1px solid #E2CAA2",
-                        }}
-                    >
-                        <thead>
-                            <tr style={{ background: "#085B6B", color: "#E2CAA2" }}>
-                                <th style={{ padding: "10px", border: "1px solid #E2CAA2", background: "#085B6B" }}>Property</th>
-                                <th style={{ padding: "10px", border: "1px solid #E2CAA2", background: "#085B6B" }}>Value</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td style={tdStyle}>Total Area</td>
-                                <td style={tdStyle}>{(getRoofArea() * 0.092903).toFixed(2)} m²</td>
-                            </tr>
-                            <tr>
-                                <td style={tdStyle}>Total Panels</td>
-                                <td style={tdStyle}>{(getRoofArea() / solarPanelArea).toFixed(0)}</td>
-                            </tr>
-                            <tr>
-                                <td style={tdStyle}>Annual Power Generation</td>
-                                <td style={tdStyle}>
-                                    {roofPanels
-                                        .reduce(
-                                            (total, panel) =>
-                                                !panel.isDeleted
-                                                    ? total + ((panel.area / solarPanelArea) * solarPanelEnergyOutput * 12) / energyConsumption * 100
-                                                    : total,
-                                            0
-                                        )
-                                        .toFixed(2)}{" "}
-                                    kWh/year
-                                </td>
-                            </tr>
-                            {roofPanels.filter((panel) => !panel.isDeleted && panel.solarData).length > 0 && (
-                                <>
-                                    <tr>
-                                        <td style={tdStyle}>Average Solar Irradiation</td>
-                                        <td style={tdStyle}>
-                                            {(
-                                                roofPanels.reduce(
-                                                    (sum, panel) =>
-                                                        !panel.isDeleted && panel.solarData ? sum + panel.solarData.maxSunshineHoursPerYear / 365 : sum,
-                                                    0
-                                                ) / roofPanels.filter((panel) => !panel.isDeleted && panel.solarData).length
-                                            ).toFixed(2)}{" "}
-                                            kWh/m²/day
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td style={tdStyle}>Average Sunshine Hours</td>
-                                        <td style={tdStyle}>
-                                            {(
-                                                roofPanels.reduce(
-                                                    (sum, panel) => (!panel.isDeleted && panel.solarData ? sum + panel.solarData.maxSunshineHoursPerYear : sum),
-                                                    0
-                                                ) / roofPanels.filter((panel) => !panel.isDeleted && panel.solarData).length
-                                            ).toFixed(2)}{" "}
-                                            hours
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td style={tdStyle}>Average CO2 Savings</td>
-                                        <td style={tdStyle}>
-                                            {(
-                                                roofPanels.reduce(
-                                                    (sum, panel) =>
-                                                        !panel.isDeleted && panel.solarData ? sum + panel.solarData.carbonOffsetFactorKgPerMwh : sum,
-                                                    0
-                                                ) / roofPanels.filter((panel) => !panel.isDeleted && panel.solarData).length
-                                            ).toFixed(2)}{" "}
-                                            Kg CO₂/year
-                                        </td>
-                                    </tr>
-                                </>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            <div style={{ width: "70%", height: "100vh", position: "relative" }}>
+                homePosition={homePosition}
+                mapRef={mapRef}
+                setCanDrawPanels={setCanDrawPanels}
+                resetDrawingState={resetDrawingState}
+                setAreaType={setAreaType}
+                resetMapState={resetMapState}
+                currentPage={currentPage}
+            />
+            <div style={{ width: "65%", height: "100vh", position: "relative" }}>
                 <GoogleMap
                     id="map-container"
                     zoom={zoom}
-                    center={center}
+                    center={homePosition || center}
                     mapContainerStyle={{ width: "100%", height: "100%" }}
                     options={options}
                     onLoad={onLoad}
@@ -909,14 +832,14 @@ export default function Map() {
                                     draggable={true}
                                     onDrag={(e) => {
                                         const newPosition = e.latLng.toJSON();
-                                        handleMarkerDrag(index, panelIndex, newPosition, true); // Update during drag
+                                        handleMarkerDrag(index, panelIndex, newPosition, true);
                                     }}
                                     onDragEnd={(e) => {
                                         const newPosition = e.latLng.toJSON();
-                                        handleMarkerDrag(index, panelIndex, newPosition, false); // Finalize on drag end
+                                        handleMarkerDrag(index, panelIndex, newPosition, false);
                                     }}
                                     onClick={() => {
-                                        alert("This point is draggable. To add a new point, click elsewhere on the map.");
+                                        handleOpenModal("This point is draggable. To add a new point, click elsewhere on the map.");
                                     }}
                                 />
                             ))
@@ -925,6 +848,42 @@ export default function Map() {
                     {home && <Marker position={home} />}
                 </GoogleMap>
             </div>
+
+            <Modal
+                open={modalOpen}
+                onClose={handleCloseModal}
+                closeAfterTransition
+                sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+                <Fade in={modalOpen}>
+                    <Box
+                        sx={{
+                            backgroundColor: '#073845',
+                            borderRadius: 1,
+                            padding: 3,
+                            boxShadow: 24,
+                            minWidth: 300,
+                            color: "#E2CAA2",
+                        }}
+                    >
+                        <Typography variant="h6" gutterBottom>
+                            Alert
+                        </Typography>
+                        <Typography variant="body1" gutterBottom>
+                            {modalMessage}
+                        </Typography>
+                        <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
+                            <Button
+                                variant="contained"
+                                color="primary"
+                                onClick={handleCloseModal}
+                            >
+                                OK
+                            </Button>
+                        </Box>
+                    </Box>
+                </Fade>
+            </Modal>
         </div>
     );
 }
