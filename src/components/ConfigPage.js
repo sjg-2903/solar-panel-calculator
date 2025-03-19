@@ -4,7 +4,6 @@ import {
     Typography,
     Button,
     FormControl,
-    InputLabel,
     Select,
     MenuItem,
     Accordion,
@@ -23,6 +22,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import DownloadIcon from "@mui/icons-material/Download";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 
 export default function ConfigPage({
     roofPanels,
@@ -81,14 +81,13 @@ export default function ConfigPage({
             <Typography variant="body2" sx={{ mb: 2 }}>
                 Klicken Sie mit der Maus auf die Eckpunkte Ihrer Dach- oder Freifläche. Mit einem Klick auf den zuerst gesetzten Punkt, können Sie die Fläche abschließen. Alle Angaben können auch nachträglich verändert werden.
             </Typography>
-
-            {/* Area Type Dropdown */}
-            <FormControl sx={{ minWidth: "100%", mt: 3 }}>
-                <InputLabel sx={{ color: "#E2CAA2" }}>Flächenart</InputLabel>
+            <Typography variant="h6" sx={{ color: "#E2CAA2", mt: 3, mb: 1 }}>
+                Flächenart :
+            </Typography>
+            <FormControl sx={{ minWidth: "100%" }}>
                 <Select
                     value={areaType}
                     onChange={handleAreaTypeChange}
-                    label="Flächenart"
                     sx={{ color: "#E2CAA2", backgroundColor: "#085B6B" }}
                 >
                     <MenuItem value="Dachfläche">Dachfläche</MenuItem>
@@ -96,8 +95,6 @@ export default function ConfigPage({
                     <MenuItem value="Beides">Beides</MenuItem>
                 </Select>
             </FormControl>
-
-            {/* Panels Section */}
             <Box
                 sx={{
                     background: "linear-gradient(135deg, #073845 10%, #085B6B 100%)",
@@ -258,7 +255,7 @@ export default function ConfigPage({
                     </Table>
                 </TableContainer>
             </Box>
-            <Box sx={{ mt: 2, display: "flex", justifyContent: "flex-start" }}>
+            <Box sx={{ mt: 2, display: "flex", justifyContent: "space-between" }}>
                 <Button
                     variant="outlined"
                     color="inherit"
@@ -267,6 +264,15 @@ export default function ConfigPage({
                     sx={{ color: "#E2CAA2", borderColor: "#E2CAA2" }}
                 >
                     Zurück zur Suche
+                </Button>
+                <Button
+                    variant="outlined"
+                    color="inherit"
+                    endIcon={<ArrowForwardIcon />}
+                    onClick={() => { }}
+                    sx={{ color: "#E2CAA2", borderColor: "#E2CAA2", ml: "auto" }}
+                >
+                    Weiter
                 </Button>
             </Box>
         </Box>

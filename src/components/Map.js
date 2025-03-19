@@ -233,7 +233,9 @@ export default function Map({ currentPage }) {
             (areaType === "Open Area" && locationType !== "Open Area") ||
             (areaType !== "Both" && locationType === "Unknown")
         ) {
-            handleOpenModal(`Please select a ${areaType.toLowerCase()} area. Current selection is ${locationType}.`);
+            let areaTypeGerman = areaType === "Roof" ? "Dachfläche" : areaType === "Open Area" ? "Freifläche" : areaType.toLowerCase();
+            let locationTypeGerman = locationType === "Roof" ? "Dachfläche" : locationType === "Open Area" ? "Freifläche" : "Unbekannt";
+            handleOpenModal(`Bitte wählen Sie eine ${areaTypeGerman}-Fläche aus. Die aktuelle Auswahl ist ${locationTypeGerman}.`);
             return;
         }
 
@@ -612,7 +614,7 @@ export default function Map({ currentPage }) {
 
     let addRoofSegmment = async (points) => {
         if (!homePosition) {
-            handleOpenModal("Please search for a location in the sidebar before adding roof segments.");
+            handleOpenModal("Bitte suchen Sie im Seitenbereich nach einem Standort, bevor Sie Dachsegmente hinzufügen.");
             return;
         }
         let index = roofPanels.length;
@@ -771,11 +773,6 @@ export default function Map({ currentPage }) {
         setTimeout(() => setResetDrawingState(false), 0);
     };
 
-    const tdStyle = {
-        padding: "10px",
-        border: "1px solid #E2CAA2",
-    };
-
     return (
         <div style={{ display: "flex", height: "100vh", width: "100%" }}>
             <Sidebar
@@ -839,7 +836,7 @@ export default function Map({ currentPage }) {
                                         handleMarkerDrag(index, panelIndex, newPosition, false);
                                     }}
                                     onClick={() => {
-                                        handleOpenModal("This point is draggable. To add a new point, click elsewhere on the map.");
+                                        handleOpenModal("Dieser Punkt ist verschiebbar. Um einen neuen Punkt hinzuzufügen, klicken Sie an eine andere Stelle auf der Karte.");
                                     }}
                                 />
                             ))
@@ -867,16 +864,17 @@ export default function Map({ currentPage }) {
                         }}
                     >
                         <Typography variant="h6" gutterBottom>
-                            Alert
+                            Warnung
                         </Typography>
                         <Typography variant="body1" gutterBottom>
                             {modalMessage}
                         </Typography>
                         <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
                             <Button
-                                variant="contained"
-                                color="primary"
+                                variant="outlined"
+                                color="inherit"
                                 onClick={handleCloseModal}
+                                sx={{ color: "#E2CAA2", borderColor: "#E2CAA2" }}
                             >
                                 OK
                             </Button>
