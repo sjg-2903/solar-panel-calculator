@@ -54,7 +54,7 @@ export default function ConfigPage({
             case "Freifläche":
                 newAreaTypeEnglish = "Open Area";
                 break;
-            case "Beides":
+            case "Dach- und Freifläche":
                 newAreaTypeEnglish = "Both";
                 break;
             default:
@@ -103,46 +103,137 @@ export default function ConfigPage({
                 >
                     <MenuItem value="Dachfläche">Dachfläche</MenuItem>
                     <MenuItem value="Freifläche">Freifläche</MenuItem>
-                    <MenuItem value="Beides">Beides</MenuItem>
+                    <MenuItem value="Dach- und Freifläche">Dach- und Freifläche</MenuItem>
                 </Select>
             </FormControl>
             <Typography variant="h6" sx={{ color: "#E2CAA2", mt: 3, mb: 1 }}>
                 An welchen Konzepten sind Sie interessiert?*
             </Typography>
             <Box>
-                <FormControlLabel
-                    control={
-                        <Checkbox
-                            checked={selectedConcepts.includes("Schlüsselfertige Eigenanlage (Dach)")}
-                            onChange={() => handleConceptChange("Schlüsselfertige Eigenanlage (Dach)")}
-                            sx={{ color: "#E2CAA2", '&.Mui-checked': { color: "#E2CAA2" } }}
+                {areaType === "Dachfläche" && (
+                    <>
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    checked={selectedConcepts.includes("Schlüsselfertige Eigenanlage (Dach)")}
+                                    onChange={() => handleConceptChange("Schlüsselfertige Eigenanlage (Dach)")}
+                                    sx={{ color: "#E2CAA2", '&.Mui-checked': { color: "#E2CAA2" } }}
+                                />
+                            }
+                            label="Schlüsselfertige Eigenanlage (Dach)"
+                            sx={{ color: "#E2CAA2" }}
                         />
-                    }
-                    label="Schlüsselfertige Eigenanlage (Dach)"
-                    sx={{ color: "#E2CAA2" }}
-                />
-                <FormControlLabel
-                    control={
-                        <Checkbox
-                            checked={selectedConcepts.includes("Dachvermietung")}
-                            onChange={() => handleConceptChange("Dachvermietung")}
-                            sx={{ color: "#E2CAA2", '&.Mui-checked': { color: "#E2CAA2" } }}
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    checked={selectedConcepts.includes("Dachvermietung")}
+                                    onChange={() => handleConceptChange("Dachvermietung")}
+                                    sx={{ color: "#E2CAA2", '&.Mui-checked': { color: "#E2CAA2" } }}
+                                />
+                            }
+                            label="Dachvermietung"
+                            sx={{ color: "#E2CAA2" }}
                         />
-                    }
-                    label="Dachvermietung"
-                    sx={{ color: "#E2CAA2" }}
-                />
-                <FormControlLabel
-                    control={
-                        <Checkbox
-                            checked={selectedConcepts.includes("Solaranlage mieten (Dach)")}
-                            onChange={() => handleConceptChange("Solaranlage mieten (Dach)")}
-                            sx={{ color: "#E2CAA2", '&.Mui-checked': { color: "#E2CAA2" } }}
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    checked={selectedConcepts.includes("Solaranlage mieten (Dach)")}
+                                    onChange={() => handleConceptChange("Solaranlage mieten (Dach)")}
+                                    sx={{ color: "#E2CAA2", '&.Mui-checked': { color: "#E2CAA2" } }}
+                                />
+                            }
+                            label="Solaranlage mieten (Dach)"
+                            sx={{ color: "#E2CAA2" }}
                         />
-                    }
-                    label="Solaranlage mieten (Dach)"
-                    sx={{ color: "#E2CAA2" }}
-                />
+                    </>
+                )}
+
+                {areaType === "Freifläche" && (
+                    <>
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    checked={selectedConcepts.includes("Schlüsselfertige Eigenanlage (Freifläche)")}
+                                    onChange={() => handleConceptChange("Schlüsselfertige Eigenanlage (Freifläche)")}
+                                    sx={{ color: "#E2CAA2", '&.Mui-checked': { color: "#E2CAA2" } }}
+                                />
+                            }
+                            label="Schlüsselfertige Eigenanlage (Freifläche)"
+                            sx={{ color: "#E2CAA2" }}
+                        />
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    checked={selectedConcepts.includes("Freiflächen vermieten")}
+                                    onChange={() => handleConceptChange("Freiflächen vermieten")}
+                                    sx={{ color: "#E2CAA2", '&.Mui-checked': { color: "#E2CAA2" } }}
+                                />
+                            }
+                            label="Freiflächen vermieten"
+                            sx={{ color: "#E2CAA2" }}
+                        />
+                    </>
+                )}
+
+                {areaType === "Dach- und Freifläche" && (
+                    <>
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    checked={selectedConcepts.includes("Schlüsselfertige Eigenanlage (Dach)")}
+                                    onChange={() => handleConceptChange("Schlüsselfertige Eigenanlage (Dach)")}
+                                    sx={{ color: "#E2CAA2", '&.Mui-checked': { color: "#E2CAA2" } }}
+                                />
+                            }
+                            label="Schlüsselfertige Eigenanlage (Dach)"
+                            sx={{ color: "#E2CAA2" }}
+                        />
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    checked={selectedConcepts.includes("Dachvermietung")}
+                                    onChange={() => handleConceptChange("Dachvermietung")}
+                                    sx={{ color: "#E2CAA2", '&.Mui-checked': { color: "#E2CAA2" } }}
+                                />
+                            }
+                            label="Dachvermietung"
+                            sx={{ color: "#E2CAA2" }}
+                        />
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    checked={selectedConcepts.includes("Solaranlage mieten (Dach)")}
+                                    onChange={() => handleConceptChange("Solaranlage mieten (Dach)")}
+                                    sx={{ color: "#E2CAA2", '&.Mui-checked': { color: "#E2CAA2" } }}
+                                />
+                            }
+                            label="Solaranlage mieten (Dach)"
+                            sx={{ color: "#E2CAA2" }}
+                        />
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    checked={selectedConcepts.includes("Schlüsselfertige Eigenanlage (Freifläche)")}
+                                    onChange={() => handleConceptChange("Schlüsselfertige Eigenanlage (Freifläche)")}
+                                    sx={{ color: "#E2CAA2", '&.Mui-checked': { color: "#E2CAA2" } }}
+                                />
+                            }
+                            label="Schlüsselfertige Eigenanlage (Freifläche)"
+                            sx={{ color: "#E2CAA2" }}
+                        />
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    checked={selectedConcepts.includes("Freiflächen vermieten")}
+                                    onChange={() => handleConceptChange("Freiflächen vermieten")}
+                                    sx={{ color: "#E2CAA2", '&.Mui-checked': { color: "#E2CAA2" } }}
+                                />
+                            }
+                            label="Freiflächen vermieten"
+                            sx={{ color: "#E2CAA2" }}
+                        />
+                    </>
+                )}
             </Box>
             <Box
                 sx={{
@@ -169,7 +260,7 @@ export default function ConfigPage({
                 <Typography variant="body2" sx={{ color: "#E2CAA2", mb: 2 }}>
                     {areaType === "Dachfläche" && "Zeichnen Sie Polygone über die süd-, ost- und westlichen Abschnitte Ihres Daches."}
                     {areaType === "Freifläche" && "Zeichnen Sie Polygone über offene grüne Felder und Flächen."}
-                    {areaType === "Beides" && "Zeichnen Sie Polygone über Dachabschnitte und offene Flächen."}
+                    {areaType === "Dach- und Freifläche" && "Zeichnen Sie Polygone über Dachabschnitte und offene Flächen."}
                     {isDrawingEnabled && " Klicken Sie auf die Karte, um ein neues Panel zu zeichnen."}
                 </Typography>
 
