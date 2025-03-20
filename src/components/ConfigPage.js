@@ -16,6 +16,8 @@ import {
     TableHead,
     TableRow,
     Paper,
+    Checkbox,
+    FormControlLabel,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -38,6 +40,7 @@ export default function ConfigPage({
     setCurrentPage,
 }) {
     const [areaType, setLocalAreaType] = useState("Dachfläche");
+    const [selectedConcepts, setSelectedConcepts] = useState([]);
 
     const handleAreaTypeChange = (event) => {
         const newAreaTypeGerman = event.target.value;
@@ -58,6 +61,14 @@ export default function ConfigPage({
                 newAreaTypeEnglish = "Roof";
         }
         setAreaType(newAreaTypeEnglish);
+    };
+
+    const handleConceptChange = (concept) => {
+        setSelectedConcepts((prev) =>
+            prev.includes(concept)
+                ? prev.filter((item) => item !== concept)
+                : [...prev, concept]
+        );
     };
 
     const handleBackToSearch = () => {
@@ -95,6 +106,44 @@ export default function ConfigPage({
                     <MenuItem value="Beides">Beides</MenuItem>
                 </Select>
             </FormControl>
+            <Typography variant="h6" sx={{ color: "#E2CAA2", mt: 3, mb: 1 }}>
+                An welchen Konzepten sind Sie interessiert?*
+            </Typography>
+            <Box>
+                <FormControlLabel
+                    control={
+                        <Checkbox
+                            checked={selectedConcepts.includes("Schlüsselfertige Eigenanlage (Dach)")}
+                            onChange={() => handleConceptChange("Schlüsselfertige Eigenanlage (Dach)")}
+                            sx={{ color: "#E2CAA2", '&.Mui-checked': { color: "#E2CAA2" } }}
+                        />
+                    }
+                    label="Schlüsselfertige Eigenanlage (Dach)"
+                    sx={{ color: "#E2CAA2" }}
+                />
+                <FormControlLabel
+                    control={
+                        <Checkbox
+                            checked={selectedConcepts.includes("Dachvermietung")}
+                            onChange={() => handleConceptChange("Dachvermietung")}
+                            sx={{ color: "#E2CAA2", '&.Mui-checked': { color: "#E2CAA2" } }}
+                        />
+                    }
+                    label="Dachvermietung"
+                    sx={{ color: "#E2CAA2" }}
+                />
+                <FormControlLabel
+                    control={
+                        <Checkbox
+                            checked={selectedConcepts.includes("Solaranlage mieten (Dach)")}
+                            onChange={() => handleConceptChange("Solaranlage mieten (Dach)")}
+                            sx={{ color: "#E2CAA2", '&.Mui-checked': { color: "#E2CAA2" } }}
+                        />
+                    }
+                    label="Solaranlage mieten (Dach)"
+                    sx={{ color: "#E2CAA2" }}
+                />
+            </Box>
             <Box
                 sx={{
                     background: "linear-gradient(135deg, #073845 10%, #085B6B 100%)",
